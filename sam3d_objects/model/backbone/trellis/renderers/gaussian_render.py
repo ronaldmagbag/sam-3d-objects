@@ -18,6 +18,20 @@ from ..representations.gaussian import Gaussian
 from .sh_utils import eval_sh
 import torch.nn.functional as F
 from easydict import EasyDict as edict
+import warnings
+
+try:
+    from diff_gaussian_rasterization import (
+        GaussianRasterizer,
+        GaussianRasterizationSettings,
+    )
+except ImportError:
+    warnings.warn(
+        "'diff_gaussian_rasterization' module cannot be imported, backend 'inria' won't be available",
+        ImportWarning,
+    )
+
+from gsplat import rasterization
 
 
 def intrinsics_to_projection(
@@ -62,19 +76,6 @@ def render(
 
     Background tensor (bg_color) must be on GPU!
     """
-    # Backend-specific imports
-    if backend == "inria":
-        if "GaussianRasterizer" not in globals():
-            from diff_gaussian_rasterization import (
-                GaussianRasterizer,
-                GaussianRasterizationSettings,
-            )
-    elif backend == "gsplat":
-        if "rasterization" not in globals():
-            from gsplat import rasterization
-    else:
-        raise ValueError(f"Unsupported backend: {backend}. Choose 'inria' or 'gsplat'")
-
     means3D = pc.get_xyz
     opacity = pc.get_opacity
     scales = pc.get_scaling
@@ -168,9 +169,9 @@ def render(
         """
         # Unnormalize the intrinsics matrix to get pixel coordinates
         Ks = viewpoint_camera.intrinsics.clone().unsqueeze(0)  # Add batch dimension
-        Ks[0, 0, 0] *= viewpoint_camera.image_width   # fx
-        Ks[0, 1, 1] *= viewpoint_camera.image_height  # fy  
-        Ks[0, 0, 2] *= viewpoint_camera.image_width   # cx
+        Ks[0, 0, 0] *= viewpoint_camera.image_width  # fx
+        Ks[0, 1, 1] *= viewpoint_camera.image_height  # fy
+        Ks[0, 0, 2] *= viewpoint_camera.image_width  # cx
         Ks[0, 1, 2] *= viewpoint_camera.image_height  # cy
 
         # For gsplat, when using SH coefficients, pass them as colors with sh_degree set
@@ -190,7 +191,9 @@ def render(
             height=int(viewpoint_camera.image_height),
             backgrounds=bg_color,
         )
-        rendered_image = render_colors.squeeze(0).permute(2, 0, 1)  # Convert to (C, H, W)
+        rendered_image = render_colors.squeeze(0).permute(
+            2, 0, 1
+        )  # Convert to (C, H, W)
 
     # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
     # They will be excluded from value updates used in the splitting criteria.

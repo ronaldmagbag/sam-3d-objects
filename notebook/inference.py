@@ -132,7 +132,7 @@ def render_video_ring(
         sample,
         extrinsics,
         intrinsics,
-        {"resolution": resolution, "bg_color": bg_color},
+        {"resolution": resolution, "bg_color": bg_color, "backend": "gsplat"},
         **kwargs,
     )
 
@@ -160,7 +160,7 @@ def render_video_flat(
         sample,
         extr,
         intr,
-        {"resolution": resolution, "bg_color": bg_color},
+        {"resolution": resolution, "bg_color": bg_color, "backend": "gsplat"},
         **kwargs,
     )
 

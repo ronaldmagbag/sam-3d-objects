@@ -1,14 +1,18 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 import random
-import torchvision.transforms as tv_transforms
-import torch
+from typing import Optional, Dict
+
 import numpy as np
 import matplotlib.pyplot as plt
-import torchvision.transforms.functional
-from sam3d_objects.data.dataset.tdfy.img_processing import pad_to_square_centered
-from typing import Optional, Dict
 from loguru import logger
+import torch
+import torch.nn.functional as F
 import torchvision
+import torchvision.transforms as tv_transforms
+import torchvision.transforms.functional
+import torchvision.transforms.functional as TF
+
+from sam3d_objects.data.dataset.tdfy.img_processing import pad_to_square_centered
 
 
 def UNNORMALIZE(mean, std):
@@ -609,3 +613,99 @@ def perturb_mask_boundary(
         mask = torch.from_numpy(mask).float()[None]  # (1, H, W)
 
     return image, mask
+
+
+def resolution_blur(
+    image: torch.Tensor,
+    mask: torch.Tensor,
+    scale_range=(0.05, 0.95),
+    interpolation_down=tv_transforms.InterpolationMode.BICUBIC,
+    interpolation_up=tv_transforms.InterpolationMode.BICUBIC,
+):
+    """
+    Blur the input image by applying upsample(downsample(x)).
+
+    Args:
+        image (torch.Tensor): Image tensor of shape (C, H, W), float32, with values in [0, 1].
+        mask (torch.Tensor): Mask tensor of shape (1, H, W), float32, with values in [0, 1]. The mask is returned unchanged.
+        scale_range: Tuple of (min_scale, max_scale) for downsampling.
+        interpolation_down: Interpolation mode for downsampling.
+        interpolation_up: Interpolation mode for upsampling.
+    """
+    C, H, W = image.shape
+    scale = random.uniform(*scale_range)
+    new_H, new_W = max(1, int(H * scale)), max(1, int(W * scale))
+
+    # Downsample
+    image = TF.resize(image, size=[new_H, new_W], interpolation=interpolation_down)
+    
+    # Upsample back to original size
+    image = TF.resize(image, size=[H, W], interpolation=interpolation_up)
+
+    return image, mask
+
+
+def gaussian_blur(
+    image: torch.Tensor,
+    mask: torch.Tensor,
+    kernel_range: tuple[int, int] = (3, 15),
+    sigma_range: tuple[int, int] = (0.1, 4.0),
+):
+    """
+    Apply gaussian blur to the input image.
+
+    Args:
+        image (torch.Tensor): Image tensor of shape (C, H, W), float32, with values in [0, 1].
+        mask (torch.Tensor): Mask tensor of shape (1, H, W), float32, with values in [0, 1]. The mask is returned unchanged.
+        kernel_range (tuple): Range of odd kernel sizes to sample from for the Gaussian blur (min, max).
+        sigma_range (tuple): Range of sigma values (standard deviation) to sample from for the Gaussian kernel (min, max).
+    """
+    kernel_size = random.choice([k for k in range(kernel_range[0], kernel_range[1]+1) if k % 2 == 1])
+    sigma = random.uniform(*sigma_range)
+    pad = kernel_size // 2
+
+    # Step 1: Pad the image
+    image = F.pad(image.unsqueeze(0), (pad, pad, pad, pad), mode='replicate')
+    
+    # Step 2: Apply gaussian blur
+    image = TF.gaussian_blur(image, kernel_size=[kernel_size, kernel_size], sigma=sigma)
+    
+    # Step 3: Unpad to get back to original size
+    image = image[:, :, pad:-pad, pad:-pad]
+    
+    return image.squeeze(0), mask
+
+
+def apply_blur_augmentation(
+    image: torch.Tensor,
+    mask: torch.Tensor,
+    p_resolution: float = 0.33,
+    p_gaussian: float = 0.33,
+    gaussian_kwargs: dict = None,
+    resolution_kwargs: dict = None,
+):
+    """Apply blur augmentation with configurable parameters"""
+    
+    # Handle None defaults BEFORE unpacking
+    if gaussian_kwargs is None:
+        gaussian_kwargs = {}
+    if resolution_kwargs is None:
+        resolution_kwargs = {}
+    
+    p_none = 1.0 - p_gaussian - p_resolution
+    assert 0 <= p_none <= 1, "Probabilities must sum to 1 and be valid."
+    
+    operation = random.choices(
+        ["gaussian", "resolution", "none"], 
+        weights=[p_gaussian, p_resolution, p_none], 
+        k=1
+    )[0]
+    
+    if operation == "gaussian":
+        return gaussian_blur(image, mask, **gaussian_kwargs)
+    elif operation == "resolution":
+        return resolution_blur(image, mask, **resolution_kwargs)
+    elif operation == "none":
+        return image, mask
+    else:
+        raise NotImplementedError
