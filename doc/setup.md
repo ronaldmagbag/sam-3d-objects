@@ -18,7 +18,8 @@ Example workflow:
 
 ```bash
 # install uv if you don't have it yet
-pip install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
 
 # create and activate a local virtualenv
 uv python install 3.11
