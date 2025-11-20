@@ -96,22 +96,14 @@ dependencies = [
   "webdataset==0.2.86",
   "xatlas==0.0.9",
   "xformers==0.0.33+5d4b92a5.d20251029",
-]
-
-[project.optional-dependencies]
-dev = [
   "findpydeps",
   "lovely_tensors",
   "pipdeptree",
   "pytest",
-]
-inference = [
   "gradio==5.49.0",
   "gsplat @ git+https://github.com/nerfstudio-project/gsplat.git@2323de5905d5e90e035f792fe65bad0fedd413e7",
   "kaolin==0.18.0",
   "seaborn==0.13.2",
-]
-p3d = [
   "flash_attn==2.8.3",
   "pytorch3d @ git+https://github.com/facebookresearch/pytorch3d.git@75ebeeaea0908c5527e7b1e305fbc7681382db47",
 ]

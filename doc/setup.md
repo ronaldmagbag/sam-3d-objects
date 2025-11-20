@@ -21,21 +21,9 @@ Example workflow:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
 
-# create and activate a local virtualenv
-uv python install 3.11
-uv venv .venv
-source .venv/bin/activate
-
 # install the base set of pinned dependencies
 uv sync
-# useful flags
-# uv sync --preview-features extra-build-dependencies  # silence warnings for git-based deps needing torch at build time
-
-# optional extras
-uv sync --extra dev       # developer tooling
-uv sync --extra p3d       # pytorch3d + flash_attn
-uv sync --extra inference # kaolin/gsplat/gradio extras
-# for demo/inference runs, you typically want both p3d and inference extras installed
+source .venv/bin/activate
 
 # patch things that aren't yet in official pip packages
 ./patching/hydra # https://github.com/facebookresearch/hydra/pull/2863
