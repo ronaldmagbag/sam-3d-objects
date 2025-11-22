@@ -10,8 +10,8 @@ config_path = f"checkpoints/{tag}/pipeline.yaml"
 inference = Inference(config_path, compile=False)
 
 # load image (RGBA only, mask is embedded in the alpha channel)
-image = load_image("notebook/images/test2/image.png")
-mask = load_single_mask("notebook/images/test2", index=0)
+image = load_image("notebook/images/shutterstock_stylish_kidsroom_1640806567/image.png")
+mask = load_single_mask("notebook/images/shutterstock_stylish_kidsroom_1640806567", index=14)
 
 # Optional USD export path (set to a filename to enable)
 usd_path = "reconstruction.usd"  # e.g., "reconstruction.usd"
