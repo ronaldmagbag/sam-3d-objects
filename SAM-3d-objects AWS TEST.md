@@ -35,3 +35,11 @@ hf download \
   facebook/sam-3d-objects
 mv checkpoints/${TAG}-download/checkpoints checkpoints/${TAG}
 rm -rf checkpoints/${TAG}-download
+
+
+
+# Make sure you're in the directory where eks.pem is located
+cd D:\AI\sam-3d-objects
+
+# Download the splat.ply file
+scp -i eks.pem ubuntu@ec2-54-87-137-237.compute-1.amazonaws.com:~/sam-3d-objects/splat.ply ./
