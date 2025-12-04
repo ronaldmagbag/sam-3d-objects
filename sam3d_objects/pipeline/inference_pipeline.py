@@ -604,8 +604,14 @@ class InferencePipeline:
         logger.info("Decoding sparse latent...")
         ret = {}
         with torch.no_grad():
+            # Clear GPU cache before decoding to free up memory
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             if "mesh" in formats:
                 ret["mesh"] = self.models["slat_decoder_mesh"](slat)
+                # Clear cache after mesh decoding to free memory for next operations
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
             if "gaussian" in formats:
                 ret["gaussian"] = self.models["slat_decoder_gs"](slat)
             if "gaussian_4" in formats:

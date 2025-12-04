@@ -14,7 +14,10 @@ image = load_image("notebook/images/shutterstock_stylish_kidsroom_1640806567/ima
 mask = load_single_mask("notebook/images/shutterstock_stylish_kidsroom_1640806567", index=14)
 
 # run model
+# Skip mesh decoding to avoid OOM error - only decode gaussian splatting
+# If you need mesh, try a larger GPU instance (g5.4xlarge with 48GB) or reduce input resolution
 output = inference(image, mask, seed=42)
+# output = inference(image, mask, seed=42, decode_formats=["gaussian"])
 
 # export gaussian splat
 output["gs"].save_ply(f"splat.ply")
