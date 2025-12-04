@@ -60,9 +60,10 @@ masks = load_masks(masks_folder, indices_list=None, extension=".png")
 num_masks = len(masks)
 print(f"Found {num_masks} masks to process")
 
-# Create output directory if it doesn't exist
-output_dir = "outputs"
+# Create output directory in image folder (3d/ subfolder)
+output_dir = os.path.join(image_folder, "3d")
 os.makedirs(output_dir, exist_ok=True)
+print(f"Output directory: {output_dir}")
 
 # Process each mask one by one
 for idx, mask in enumerate(masks):
