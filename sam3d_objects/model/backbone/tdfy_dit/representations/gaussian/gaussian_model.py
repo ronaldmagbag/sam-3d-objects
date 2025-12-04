@@ -148,15 +148,29 @@ class Gaussian:
         scale = torch.log(self.get_scaling).detach().cpu().numpy()
         rotation = (self._rotation + self.rots_bias[None, :]).detach().cpu().numpy()
 
+        # Convert SH coefficients to RGB colors for MeshLab compatibility
+        # For sh_degree=0: RGB = 0.5 + 0.282095 * f_dc (standard Gaussian Splatting conversion)
+        # This matches how the renderer converts SH to RGB
+        SH_C0 = 0.282095  # Spherical harmonics C0 coefficient
+        rgb = np.clip(0.5 + SH_C0 * f_dc, 0.0, 1.0)
+        # Convert to uint8 [0, 255] for PLY format
+        rgb_uint8 = (rgb * 255).astype(np.uint8)
+
         dtype_full = [
             (attribute, "f4") for attribute in self.construct_list_of_attributes()
         ]
+        # Add RGB color attributes for MeshLab compatibility
+        dtype_full.extend([("red", "u1"), ("green", "u1"), ("blue", "u1")])
 
         elements = np.empty(xyz.shape[0], dtype=dtype_full)
+        # Build attributes array including RGB colors
         attributes = np.concatenate(
             (xyz, normals, f_dc, opacities, scale, rotation), axis=1
         )
-        elements[:] = list(map(tuple, attributes))
+        # Combine all attributes with RGB colors
+        for i in range(xyz.shape[0]):
+            row_data = list(attributes[i]) + [rgb_uint8[i, 0], rgb_uint8[i, 1], rgb_uint8[i, 2]]
+            elements[i] = tuple(row_data)
         el = PlyElement.describe(elements, "vertex")
         PlyData([el]).write(path)
 
