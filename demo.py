@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description="Process 3D objects from image and 
 parser.add_argument(
     "image_folder",
     type=str,
-    help="Path to folder containing image.png and mask files (0.png, 1.png, ...)",
+    help="Path to folder containing image.png/jpg and masks/ subfolder with mask files (0.png, 1.png, ...)",
     default="notebook/images/shutterstock_stylish_kidsroom_1640806567",
     nargs="?",
 )
@@ -19,17 +19,25 @@ args = parser.parse_args()
 
 # Image and mask folder path
 image_folder = args.image_folder
-image_path = os.path.join(image_folder, "image.png")
 
 # Validate image folder exists
 if not os.path.exists(image_folder):
     print(f"Error: Image folder does not exist: {image_folder}")
     sys.exit(1)
 
-# Validate image.png exists
-if not os.path.exists(image_path):
-    print(f"Error: image.png not found in folder: {image_folder}")
+# Find image file (supports both PNG and JPG)
+image_path = None
+for ext in [".png", ".jpg", ".PNG", ".JPG", ".jpeg", ".JPEG"]:
+    candidate = os.path.join(image_folder, f"image{ext}")
+    if os.path.exists(candidate):
+        image_path = candidate
+        break
+
+if image_path is None:
+    print(f"Error: image.png or image.jpg not found in folder: {image_folder}")
     sys.exit(1)
+
+print(f"Found image: {image_path}")
 
 # load model
 tag = "hf"
@@ -40,9 +48,15 @@ inference = Inference(config_path, compile=False)
 print(f"Loading image from: {image_path}")
 image = load_image(image_path)
 
-# Find all masks in the folder (0.png, 1.png, 2.png, ...)
-print(f"Scanning for masks in: {image_folder}")
-masks = load_masks(image_folder, indices_list=None, extension=".png")
+# Find all masks in the masks/ subfolder (0.png, 1.png, 2.png, ...)
+masks_folder = os.path.join(image_folder, "masks")
+if not os.path.exists(masks_folder):
+    print(f"Error: Masks folder does not exist: {masks_folder}")
+    print("Please run sam3_mask_generator.py first to generate masks, or create the masks/ folder manually")
+    sys.exit(1)
+
+print(f"Scanning for masks in: {masks_folder}")
+masks = load_masks(masks_folder, indices_list=None, extension=".png")
 num_masks = len(masks)
 print(f"Found {num_masks} masks to process")
 

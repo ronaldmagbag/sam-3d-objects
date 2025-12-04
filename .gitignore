@@ -3,4 +3,4 @@ __pycache__
 /checkpoints
 /outputs
 /3rdparty
-
+/tests
