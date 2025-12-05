@@ -337,13 +337,11 @@ def postprocess_mesh(
     if fill_holes:
         # Try to use nvdiffrast for hole filling, but gracefully skip if it fails
         try:
-            vertices, faces = (
-                torch.tensor(vertices).cuda(),
-                torch.tensor(faces.astype(np.int32)).cuda(),
-            )
-            vertices, faces = _fill_holes(
-                vertices,
-                faces,
+            vertices_tensor = torch.tensor(vertices).cuda()
+            faces_tensor = torch.tensor(faces.astype(np.int32)).cuda()
+            vertices_tensor, faces_tensor = _fill_holes(
+                vertices_tensor,
+                faces_tensor,
                 max_hole_size=fill_holes_max_hole_size,
                 max_hole_nbe=fill_holes_max_hole_nbe,
                 resolution=fill_holes_resolution,
@@ -351,13 +349,14 @@ def postprocess_mesh(
                 debug=debug,
                 verbose=verbose,
             )
-            vertices, faces = vertices.cpu().numpy(), faces.cpu().numpy()
+            vertices, faces = vertices_tensor.cpu().numpy(), faces_tensor.cpu().numpy()
             if verbose:
                 tqdm.write(
                     f"After remove invisible faces: {vertices.shape[0]} vertices, {faces.shape[0]} faces"
                 )
         except (ImportError, ModuleNotFoundError, RuntimeError, OSError) as e:
             # nvdiffrast not available or failed to compile/load CUDA extensions
+            # Ensure vertices and faces remain as numpy arrays (they already are)
             if verbose:
                 error_msg = str(e)
                 if "cuda_runtime.h" in error_msg or "cannot open shared object file" in error_msg or "Error building extension" in error_msg:
@@ -370,6 +369,14 @@ def postprocess_mesh(
                         f"Warning: nvdiffrast not available ({error_msg[:100]}), skipping hole filling. "
                         "Mesh will be exported without hole filling."
                     )
+            # Ensure vertices and faces are numpy arrays (in case they were converted to tensors)
+            if isinstance(vertices, torch.Tensor):
+                vertices = vertices.cpu().numpy()
+            if isinstance(faces, torch.Tensor):
+                faces = faces.cpu().numpy()
+            # Ensure correct dtypes
+            vertices = np.asarray(vertices, dtype=np.float32)
+            faces = np.asarray(faces, dtype=np.int32)
 
     return vertices, faces
 
@@ -382,6 +389,15 @@ def parametrize_mesh(vertices: np.array, faces: np.array):
         vertices (np.array): Vertices of the mesh. Shape (V, 3).
         faces (np.array): Faces of the mesh. Shape (F, 3).
     """
+    # Ensure vertices and faces are numpy arrays (convert from tensors if needed)
+    if isinstance(vertices, torch.Tensor):
+        vertices = vertices.cpu().numpy()
+    if isinstance(faces, torch.Tensor):
+        faces = faces.cpu().numpy()
+    
+    # Ensure correct dtypes for xatlas
+    vertices = vertices.astype(np.float32)
+    faces = faces.astype(np.uint32)
 
     vmapping, indices, uvs = xatlas.parametrize(vertices, faces)
 
