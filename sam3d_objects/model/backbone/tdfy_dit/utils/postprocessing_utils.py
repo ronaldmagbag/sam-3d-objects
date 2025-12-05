@@ -517,7 +517,24 @@ def bake_texture(
         texture = cv2.inpaint(texture, mask, 3, cv2.INPAINT_TELEA)
 
     elif mode == "opt":
-        rastctx = utils3d.torch.RastContext(backend=device if device.startswith("cuda") else "cuda")
+        try:
+            rastctx = utils3d.torch.RastContext(backend=device if device.startswith("cuda") else "cuda")
+        except (ImportError, ModuleNotFoundError, RuntimeError, OSError) as e:
+            error_msg = str(e)
+            if "cuda_runtime.h" in error_msg or "cannot open shared object file" in error_msg or "Error building extension" in error_msg:
+                raise RuntimeError(
+                    "nvdiffrast CUDA extensions failed to compile/load. This is required for texture baking.\n"
+                    "To fix this:\n"
+                    "1. Install CUDA toolkit: sudo apt-get install -y cuda-toolkit-12-1\n"
+                    "2. Set environment variables:\n"
+                    "   export CUDA_HOME=/usr/local/cuda-12.1\n"
+                    "   export PATH=$CUDA_HOME/bin:$PATH\n"
+                    "   export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH\n"
+                    "3. Clear cache and reinstall: rm -rf ~/.cache/torch_extensions && pip uninstall nvdiffrast -y && pip install git+https://github.com/NVlabs/nvdiffrast.git\n"
+                    "See custom/NVDIFFRAST_INSTALL_FIX.md for detailed instructions."
+                ) from e
+            else:
+                raise
         observations = [observations.flip(0) for observations in observations]
         masks = [m.flip(0) for m in masks]
         _uv = []
