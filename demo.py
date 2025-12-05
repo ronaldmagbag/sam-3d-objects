@@ -60,10 +60,17 @@ masks = load_masks(masks_folder, indices_list=None, extension=".png")
 num_masks = len(masks)
 print(f"Found {num_masks} masks to process")
 
-# Create output directory in image folder (3d/ subfolder)
-output_dir = os.path.join(image_folder, "3d")
-os.makedirs(output_dir, exist_ok=True)
-print(f"Output directory: {output_dir}")
+# Create output directories in image folder (ply/ and usd/ subfolders)
+ply_dir = os.path.join(image_folder, "ply")
+usd_dir = os.path.join(image_folder, "usd")
+os.makedirs(ply_dir, exist_ok=True)
+os.makedirs(usd_dir, exist_ok=True)
+print(f"PLY output directory: {ply_dir}")
+print(f"USD output directory: {usd_dir}")
+
+# USD export settings
+usd_scale_factor = 100.0  # Adjust the scale factor to match your scene units (default 100)
+embed_textures = True
 
 # Process each mask one by one
 for idx, mask in enumerate(masks):
@@ -72,21 +79,40 @@ for idx, mask in enumerate(masks):
     print(f"{'='*60}")
     
     try:
-        # run model
+        # Set USD export path for this mask
+        usd_path = os.path.join(usd_dir, f"reconstruction_mask_{idx}.usd")
+        
+        # run model with USD export support
         # Skip mesh decoding to avoid OOM error - only decode gaussian splatting
         # If you need mesh, try a larger GPU instance (g5.4xlarge with 48GB) or reduce input resolution
-        output = inference(image, mask, seed=42)
+        output = inference(
+            image, 
+            mask, 
+            seed=42,
+            export_usd_path=usd_path,
+            usd_scale_factor=usd_scale_factor,
+            embed_textures=embed_textures
+        )
         # output = inference(image, mask, seed=42, decode_formats=["gaussian"])
 
         # export gaussian splat with unique filename
-        output_filename = os.path.join(output_dir, f"splat_mask_{idx}.ply")
-        output["gs"].save_ply(output_filename)
-        print(f"✓ Saved: {output_filename}")
+        ply_filename = os.path.join(ply_dir, f"splat_mask_{idx}.ply")
+        output["gs"].save_ply(ply_filename)
+        print(f"✓ Saved PLY: {ply_filename}")
+        
+        # Check if USD export was successful
+        if output.get("usd_path"):
+            print(f"✓ Saved USD: {output['usd_path']}")
+        elif usd_path is not None:
+            print(f"⚠ USD export requested but failed for mask {idx}; check logs for details.")
         
     except Exception as e:
         print(f"✗ Error processing mask {idx}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         continue
 
 print(f"\n{'='*60}")
-print(f"Processing complete! Generated {num_masks} splat files in '{output_dir}' directory")
+print(f"Processing complete! Generated {num_masks} PLY files in '{ply_dir}' directory")
+print(f"USD files saved in '{usd_dir}' directory (if export was successful)")
 print(f"{'='*60}")

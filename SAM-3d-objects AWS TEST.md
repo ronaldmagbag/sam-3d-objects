@@ -1,6 +1,6 @@
 SAM-3d-objects AWS TEST
 
-ssh -i eks.pem ubuntu@ec2-54-87-137-237.compute-1.amazonaws.com
+ssh -i eks.pem ubuntu@ec2-98-87-168-8.compute-1.amazonaws.com
 
 git clone --recursive https://github.com/facebookresearch/sam-3d-objects.git
 cd sam-3d-objects

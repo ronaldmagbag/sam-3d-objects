@@ -16,18 +16,13 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Miniconda (mamba-compatible)
+# Install Miniconda
 RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
     /bin/bash /tmp/miniconda.sh -b -p /opt/conda && \
     rm /tmp/miniconda.sh && \
-    /opt/conda/bin/conda clean --all -y && \
+    /opt/conda/bin/conda clean --all --yes && \
     ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
     echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc
-
-# Accept conda Terms of Service and install mamba
-RUN /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
-    /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
-    /opt/conda/bin/conda install -y -c conda-forge mamba
 
 # Set working directory (code will be mounted as volume)
 WORKDIR /workspace
@@ -38,8 +33,11 @@ COPY environments/default.yml /tmp/default.yml
 # Create conda environment from default.yml with all CUDA/system dependencies
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/etc/profile.d/conda.sh && \
-    /opt/conda/bin/mamba env create -f /tmp/default.yml && \
-    /opt/conda/bin/mamba clean -afy && \
+    /opt/conda/bin/conda config --set always_yes true && \
+    /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
+    /opt/conda/bin/conda env create -f /tmp/default.yml && \
+    /opt/conda/bin/conda clean --all --yes && \
     rm /tmp/default.yml
 
 # Set up pip indexes for PyTorch and NVIDIA packages
@@ -50,7 +48,7 @@ ENV PIP_FIND_LINKS="https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.5.1
 RUN source /opt/conda/etc/profile.d/conda.sh && \
     conda activate sam3d-objects && \
     pip install --no-cache-dir torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-    
+
 # Copy dependency files needed for installation
 # Build context should be project root: docker build -f custom/Dockerfile .
 COPY pyproject.toml /workspace/
