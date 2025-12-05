@@ -83,17 +83,17 @@ for idx, mask in enumerate(masks):
         usd_path = os.path.join(usd_dir, f"reconstruction_mask_{idx}.usd")
         
         # run model with USD export support
-        # Skip mesh decoding to avoid OOM error - only decode gaussian splatting
-        # If you need mesh, try a larger GPU instance (g5.4xlarge with 48GB) or reduce input resolution
+        # USD export requires mesh decoding, so we need to include "mesh" in decode_formats
+        # Note: This may cause OOM errors on smaller GPUs - try g5.4xlarge (48GB) if needed
         output = inference(
             image, 
             mask, 
             seed=42,
             export_usd_path=usd_path,
             usd_scale_factor=usd_scale_factor,
-            embed_textures=embed_textures
+            embed_textures=embed_textures,
+            decode_formats=["gaussian", "mesh"]  # Include mesh for USD export
         )
-        # output = inference(image, mask, seed=42, decode_formats=["gaussian"])
 
         # export gaussian splat with unique filename
         ply_filename = os.path.join(ply_dir, f"splat_mask_{idx}.ply")
@@ -103,8 +103,15 @@ for idx, mask in enumerate(masks):
         # Check if USD export was successful
         if output.get("usd_path"):
             print(f"✓ Saved USD: {output['usd_path']}")
+            if output.get("usdz_path"):
+                print(f"✓ Saved USDZ: {output['usdz_path']}")
         elif usd_path is not None:
-            print(f"⚠ USD export requested but failed for mask {idx}; check logs for details.")
+            # Diagnose why USD export failed
+            if "mesh" not in output:
+                print(f"⚠ USD export failed for mask {idx}: Mesh data not available (mesh decoding may have failed or was skipped)")
+                print(f"  Hint: USD export requires mesh decoding. If you got OOM errors, try a larger GPU (g5.4xlarge with 48GB)")
+            else:
+                print(f"⚠ USD export requested but failed for mask {idx}; check logs above for error details.")
         
     except Exception as e:
         print(f"✗ Error processing mask {idx}: {str(e)}")
