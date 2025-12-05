@@ -93,6 +93,8 @@ def _fill_holes(
 
     # Rasterize
     visblity = torch.zeros(faces.shape[0], dtype=torch.int32, device=verts.device)
+    # Note: If RastContext creation fails (e.g., CUDA extensions not compiled),
+    # the exception will be caught by the caller in postprocess_mesh()
     rastctx = utils3d.torch.RastContext(backend="cuda")
     for i in tqdm(
         range(views.shape[0]),
@@ -333,25 +335,41 @@ def postprocess_mesh(
 
     # Remove invisible faces
     if fill_holes:
-        vertices, faces = (
-            torch.tensor(vertices).cuda(),
-            torch.tensor(faces.astype(np.int32)).cuda(),
-        )
-        vertices, faces = _fill_holes(
-            vertices,
-            faces,
-            max_hole_size=fill_holes_max_hole_size,
-            max_hole_nbe=fill_holes_max_hole_nbe,
-            resolution=fill_holes_resolution,
-            num_views=fill_holes_num_views,
-            debug=debug,
-            verbose=verbose,
-        )
-        vertices, faces = vertices.cpu().numpy(), faces.cpu().numpy()
-        if verbose:
-            tqdm.write(
-                f"After remove invisible faces: {vertices.shape[0]} vertices, {faces.shape[0]} faces"
+        # Try to use nvdiffrast for hole filling, but gracefully skip if it fails
+        try:
+            vertices, faces = (
+                torch.tensor(vertices).cuda(),
+                torch.tensor(faces.astype(np.int32)).cuda(),
             )
+            vertices, faces = _fill_holes(
+                vertices,
+                faces,
+                max_hole_size=fill_holes_max_hole_size,
+                max_hole_nbe=fill_holes_max_hole_nbe,
+                resolution=fill_holes_resolution,
+                num_views=fill_holes_num_views,
+                debug=debug,
+                verbose=verbose,
+            )
+            vertices, faces = vertices.cpu().numpy(), faces.cpu().numpy()
+            if verbose:
+                tqdm.write(
+                    f"After remove invisible faces: {vertices.shape[0]} vertices, {faces.shape[0]} faces"
+                )
+        except (ImportError, ModuleNotFoundError, RuntimeError, OSError) as e:
+            # nvdiffrast not available or failed to compile/load CUDA extensions
+            if verbose:
+                error_msg = str(e)
+                if "cuda_runtime.h" in error_msg or "cannot open shared object file" in error_msg or "Error building extension" in error_msg:
+                    tqdm.write(
+                        "Warning: nvdiffrast CUDA extensions not available (missing CUDA headers or compilation failed), "
+                        "skipping hole filling. Mesh will be exported without hole filling."
+                    )
+                else:
+                    tqdm.write(
+                        f"Warning: nvdiffrast not available ({error_msg[:100]}), skipping hole filling. "
+                        "Mesh will be exported without hole filling."
+                    )
 
     return vertices, faces
 
